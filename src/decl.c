@@ -193,6 +193,7 @@ static void decl(Symbol (*dcl)(int, char *, Type, Coordinate *)) {
 			t = gettok();
 			id = NULL;
 			pos = src;
+			// dclr 用来分析声明符
 			ty1 = dclr(ty, &id, NULL, 0);
 		}
 	} else if (ty == NULL
@@ -221,6 +222,7 @@ static Symbol dclglobal(int sclass, char *id, Type ty, Coordinate *pos) {
 		if (!isfunc(ty) && p->defined && t == '=')
 			error("redefinition of `%s' previously defined at %w\n", p->name, &p->src);
 
+		// check for inconsistent linkage
 		if (p->sclass == EXTERN && sclass == STATIC
 		||  p->sclass == STATIC && sclass == AUTO
 		||  p->sclass == AUTO   && sclass == STATIC)
@@ -315,6 +317,7 @@ static Type dclr(Type basety, char **id, Symbol **params, int abstract) {
 		warning("more than 32767 bytes in `%t'\n", basety);
 	return basety;
 }
+// tnode函数为各个元素分配存储空间并进行初始化
 static Type tnode(int op, Type type) {
 	Type ty;
 
@@ -323,6 +326,7 @@ static Type tnode(int op, Type type) {
 	ty->type = type;
 	return ty;
 }
+// declarator的分析函数
 static Type dclr1(char **id, Symbol **params, int abstract) {
 	Type ty = NULL;
 

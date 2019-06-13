@@ -37,10 +37,14 @@ static Symbol   spillee(Symbol, unsigned mask[], Node);
 static void     spillr(Symbol, Node);
 static int      uses(Node, Regnode);
 
+// offset就是最后一个自动变量的栈偏移的绝对值
 int offset;
 
 int maxoffset;
 
+// 接口过程function设置framesize的值等于或者大于maxoffset, 以留出空间来存储诸如被调用程序必须保存的
+// 寄存器之类的数据, 他还会生成过程头和过程尾代码, 这些代码根据framesize调整栈指针, 以分配或者释放该程序
+// 的栈空间.
 int framesize;
 int argoffset;
 
@@ -76,6 +80,7 @@ unsigned freemask[2];
 unsigned usedmask[2];
 unsigned tmask[2];
 unsigned vmask[2];
+// mkreg创建初始化寄存器符号
 Symbol mkreg(char *fmt, int n, int mask, int set) {
 	Symbol p;
 
@@ -95,6 +100,7 @@ Symbol mkwildcard(Symbol *syms) {
 	p->x.wildcard = syms;
 	return p;
 }
+// mkauto函数将栈空间进行对齐, 以便安排下一帧
 void mkauto(Symbol p) {
 	assert(p->sclass == AUTO);
 	offset = roundup(offset + p->type->size, p->type->align);
@@ -126,6 +132,9 @@ static void docall(Node p) {
 		maxargoffset = argoffset;
 	argoffset = 0;
 }
+// blkcopy函数是块复制代码生成器的入口
+// 它与目标机器无关
+// 与blkloop的参数相同
 void blkcopy(int dreg, int doff, int sreg, int soff, int size, int tmp[]) {
 	assert(size >= 0);
 	if (size == 0)
@@ -171,6 +180,7 @@ void parseflags(int argc, char *argv[]) {
 		else if (strcmp(argv[i], "-b") == 0)	/* omit */
 			bflag = 1;			/* omit */
 }
+// lcc has three reducers. One identifes the nodes that need registers, another emits code, and a third prints a tree cover to help during debugging. They all use getrule, which wraps _rule in some assertions and encapsulates the indirection through IR;
 static int getrule(Node p, int nt) {
 	int rulenum;
 
@@ -182,6 +192,9 @@ static int getrule(Node p, int nt) {
 	}
 	return rulenum;
 }
+// lburg flags in x.isinstruction rules that emit instructions, in constrast to those that 
+// emit subinstructions like addressing modes;it does so by examining the assembler template,
+// which Section 14.6 explains
 static void reduce(Node p, int nt) {
 	int rulenum, i;
 	short *nts;
@@ -194,6 +207,11 @@ static void reduce(Node p, int nt) {
 	for (i = 0; nts[i]; i++)
 		reduce(kids[i], nts[i]);
 	if (IR->x._isinstruction[rulenum]) {
+		// x.inst is more than just a flags;it also indentifies the nonterminal
+		// responsible for the mark. The register allocator linearizes
+		// the instruction tree, and the emitter reduces each instruction 
+		// in isolation, so the emitter needs a record of the nonterminal used
+		// in the instruction's reduction.
 		assert(p->x.inst == 0 || p->x.inst == nt);
 		p->x.inst = nt;
 		if (p->syms[RX] && p->syms[RX]->temporary) {
@@ -208,6 +226,8 @@ static Node reuse(Node p, int nt) {
 	};
 	Symbol r = p->syms[RX];
 
+	// cse stand for "common subexpressions"
+	//
 	if (generic(p->op) == INDIR && p->kids[0]->op == VREG+P
 	&& r->u.t.cse && p->x.mayrecalc
 	&& ((struct _state*)r->u.t.cse->x.state)->cost[nt] == 0)
@@ -216,10 +236,14 @@ static Node reuse(Node p, int nt) {
 		return p;
 }
 
+// 即使其中一个输入改变了,公共子表达式也不能重新计算
+// 在允许一个额外的匹配名额之前, labeller调用mayrecalc进一步证实
+// 该公共子表达式可以被重新计算,并把结果记录在x.mayrecalc中
 int mayrecalc(Node p) {
 	int op;
 
 	assert(p && p->syms[RX]);
+	// 如果节点不在公共子表达式, mayrelcalc就会返回假
 	if (p->syms[RX]->u.t.cse == NULL)
 		return 0;
 	op = generic(p->syms[RX]->u.t.cse->op);
@@ -229,6 +253,8 @@ int mayrecalc(Node p) {
 	} else
 		return 0;
 }
+// reduce及其辅助程序执行完毕后, gen调用prune.
+//
 static Node *prune(Node p, Node pp[]) {
 	if (p == NULL)
 		return pp;

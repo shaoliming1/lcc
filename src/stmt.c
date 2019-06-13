@@ -345,6 +345,7 @@ static void swstmt(int loop, int lab, int lev) {
 	sw.labels = newarray(SWSIZE, sizeof *sw.labels, FUNC);
 	refinc /= 10.0;
 	statement(loop, &sw, lev);
+	// define L, if necessary, and L+1
 	if (sw.deflab == NULL) {
 		sw.deflab = findlabel(lab);
 		definelab(lab);

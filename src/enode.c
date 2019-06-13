@@ -17,8 +17,15 @@ Tree (*optree[])(int, Tree, Tree) = {
 #define yy(a,b,c,d,e,f,g) e,
 #include "token.h"
 };
+// 处理函数调用
+// note:
+// rty是返回类型，proto的值分两种情况：如果是旧风格的函数
+// ，proto=NULL。如果是新风格函数，proto保存的是函数原型
 Tree call(Tree f, Type fty, Coordinate src) {
+	// 变量n对实参进行计数
 	int n = 0;
+	// args表示参数的根节点
+	// r是RIGHT树的根节点
 	Tree args = NULL, r = NULL, e;
 	Type *proto, rty = unqual(freturn(fty));
 	Symbol t3 = NULL;
@@ -29,7 +36,7 @@ Tree call(Tree f, Type fty, Coordinate src) {
 		proto = fty->u.f.proto;
 	if (hascall(f))
 		r = f;
-	if (isstruct(rty))
+	if (isstruct(rty)) // 初始化 struct function
 		{
 			t3 = temporary(AUTO, unqual(rty));
 			if (rty->size == 0)

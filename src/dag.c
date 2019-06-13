@@ -36,6 +36,11 @@ static void typestab(Symbol, void *);
 static Node undag(Node);
 static Node visit(Node, int);
 static void unlist(void);
+// walk和listnodes函数操作处理dag森林。森林序列表示函数代码。该森林序列由代码中的
+// Gen, Jump, Label入口组成。
+// walk函数通过调用listnodes函数将树e转换成dag, 并且将森林添加到代码表的Gen入口，
+// 然后为新的森林重新初始化编译前端的一些变量。
+// 将tree转换为dag的复杂工作主要由listnodes函数承担，因此，walk函数很简单。
 void walk(Tree tp, int tlab, int flab) {
 	listnodes(tp, tlab, flab);
 	if (forest) {
@@ -50,6 +55,8 @@ void walk(Tree tp, int tlab, int flab) {
 	deallocate(STMT);
 }
 
+// node函数在buckets中搜索具有相同操作符，操作数和符号， 如果找到就返回该节点
+// 否则， 就创建一个新的节点， 并将新节点添加到buckets中， 然后返回新节点
 static Node node(int op, Node l, Node r, Symbol sym) {
 	int i;
 	struct dag *p;
@@ -65,6 +72,8 @@ static Node node(int op, Node l, Node r, Symbol sym) {
 	++nodecount;
 	return &p->node;
 }
+// dagnode函数分配并初始化新的dag和它包含的节点。
+// 如果有操作数节点， 它还要负责增加该操作数节点的count域
 static struct dag *dagnode(int op, Node l, Node r, Symbol sym) {
 	struct dag *p;
 
@@ -77,15 +86,22 @@ static struct dag *dagnode(int op, Node l, Node r, Symbol sym) {
 	p->node.syms[0] = sym;
 	return p;
 }
+// 调用newnode函数跳过查表过程， 直接构建一个新的节点， 但新节点不添加到buckets中
+// 只有newnode函数可以被编译后端用来构造他们所需要的节点，比如生成溢出寄存器的代码。
 Node newnode(int op, Node l, Node r, Symbol sym) {
 	return &dagnode(op, l, r, sym)->node;
 }
+// killnodes去掉因为赋值（ASGN)导致的失效节点
+// lcc按两种情况处理：
+// 对标识符的赋值要删除标识符的右值节点，而其他有副作用的操作符要清楚所有节点
+// 。
 static void killnodes(Symbol p) {
 	int i;
 	struct dag **q;
 
 	for (i = 0; i < NELEMS(buckets); i++)
 		for (q = &buckets[i]; *q; )
+			// *q represents p's rvalue
 			if (generic((*q)->node.op) == INDIR &&
 			    (!isaddrop((*q)->node.kids[0]->op)
 			     || (*q)->node.kids[0]->syms[0] == p)) {
@@ -94,11 +110,14 @@ static void killnodes(Symbol p) {
 			} else
 				q = &(*q)->hlink;
 }
+// reset函数通过清楚buckets和nodecount来删除buckets中所有节点
 static void reset(void) {
 	if (nodecount > 0)
 		memset(buckets, 0, sizeof buckets);
 	nodecount = 0;
 }
+// listnodes为作为其参数的树构建节点，实现时，根据树的操作树来递归调用自身， 根据
+// 操作符调用node函数或者newnode函数， 有必要的话还要调用killnodes或者reset函数
 Node listnodes(Tree tp, int tlab, int flab) {
 	Node p = NULL, l, r;
 	int op;
@@ -106,12 +125,17 @@ Node listnodes(Tree tp, int tlab, int flab) {
 	assert(tlab || flab || tlab == 0 && flab == 0);
 	if (tp == NULL)
 		return NULL;
+	// tp->node指向树tp的节点。
+	// 这个域标识了listnodes函数访问过的树，并确保listnodes函数，并确保listnodes函数为就是dag的树返回的正确节点
+	// 在这些用法中多次引用的子树会不止一次被访问。
+	// 第一次访问时构建节点，而接下来的访问只是访问该节点。
 	if (tp->node)
 		return tp->node;
 	if (isarray(tp->type))
 		op = tp->op + sizeop(voidptype->size);
 	else
 		op = tp->op + sizeop(tp->type->size);
+	// 在listnodes函数中的switch语句将操作符分组， 同一组中的操作符具有相同的遍历和构建节点代码
 	switch (generic(tp->op)) {
 	case AND:   { if (depth++ == 0) reset();
 		      if (flab) {
@@ -345,6 +369,9 @@ Node listnodes(Tree tp, int tlab, int flab) {
 	case INDIR: { Type ty = tp->kids[0]->type;
 		      assert(tlab == 0 && flab == 0);
 		      l = listnodes(tp->kids[0], 0, 0);
+		      // 如果左值的类型是（POINTER T), INDIR 就会按其他一元操作符一样处理。
+		      // 但是如果左值的类型是(POINTER (VOLATILE T)) 则再源代码中对右值的每一次读取
+		      // 必须在执行时实际读取右值。
 		      if (isptr(ty))
 		      	ty = unqual(ty)->type;
 		      if (isvolatile(ty)

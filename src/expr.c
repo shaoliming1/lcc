@@ -461,6 +461,8 @@ Tree lvalue(Tree p) {
 		warning("`%t' used as an lvalue\n", p->type);
 	return p->kids[0];
 }
+// 当p->type == ty 时，返回p
+// 否则返回ty类型的副本
 Tree retype(Tree p, Type ty) {
 	Tree q;
 
@@ -510,6 +512,8 @@ Type binary(Type xty, Type yty) {
 	return inttype;
 #undef xx
 }
+// 将array T装换成 POINTER T
+// 将function T 转换成 POINTER(FUNCTION T))
 Tree pointer(Tree p) {
 	if (isarray(p->type))
 		/* assert(p->op != RIGHT || p->u.sym == NULL), */
@@ -518,6 +522,8 @@ Tree pointer(Tree p) {
 		p = retype(p, ptr(p->type));
 	return p;
 }
+// cond 就是函数value的逆转换。它处理一稞表示某个值的树，添加一个与
+// 0进行比较的操作，从而将它转换成一棵表示条件的树。
 Tree cond(Tree p) {
 	int op = generic(rightkid(p)->op);
 
@@ -528,6 +534,7 @@ Tree cond(Tree p) {
 	p = pointer(p);
 	return (*optree[NEQ])(NE, p, consttree(0, inttype));
 }
+// cast 将它的参数转换为type
 Tree cast(Tree p, Type type) {
 	Type src, dst;
 

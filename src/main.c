@@ -51,6 +51,7 @@ int main(int argc, char *argv[]) {
 	}
 	init(argc, argv); /* 初始化 */
 	t = gettok();
+	// progbeg处理前端不能识别的程序参数，progbeg处理与特定目标机器相关的选项，并且初始化后端。
 	(*IR->progbeg)(argc, argv);
 	for (i = 1; i < argc; i++)
 		if (strcmp(argv[i], "-n") == 0) {
