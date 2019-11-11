@@ -191,6 +191,7 @@ enum {
 #define gop(name,value) name=value<<4,
 #define op(name,type,sizes)
 
+// LASTOP本身只是为了符合c语言的语法,最后一个元素没有`,`号
 enum {
 #include "ops.h"
 	LASTOP
@@ -288,8 +289,8 @@ struct symbol {
 		} c;
 		struct {
 			Coordinate pt;
-			int label;
 			int ncalls;
+			int label;
 			Symbol *callee;
 		} f;
 		int seg;
@@ -324,11 +325,17 @@ enum {
 	FIELD=43<<4
 };
 struct type {
+	// op可以取值:
+	// 		整数类型: CHAR, INT, LONG LONG, LONG, UNSIGNED, ENUM
+	//		浮点类型: FLOAT, DOUBLE
+	//		聚合类型: ARRAY, STRUCT, UNION
 	int op;
 	Type type;
 	int align;
 	int size;
 	union {
+		// struct, enum, union会使用用来提供关于这个结构体,union,枚举体的详细信息
+		//
 		Symbol sym;
 		struct {
 			unsigned oldstyle:1;

@@ -327,6 +327,7 @@ static Type tnode(int op, Type type) {
 	return ty;
 }
 // declarator的分析函数
+// 接受一个id,params,abstract参数非零时,可以分析抽象声明符.
 static Type dclr1(char **id, Symbol **params, int abstract) {
 	Type ty = NULL;
 
@@ -662,7 +663,6 @@ static void funcdefn(int sclass, char *id, Type ty, Symbol params[], Coordinate 
 	int i, n;
 	Symbol *callee, *caller, p;
 	Type rty = freturn(ty);
-
 	if (isstruct(rty) && rty->size == 0)
 		error("illegal use of incomplete type `%t'\n", rty);
 	for (n = 0; params[n]; n++)

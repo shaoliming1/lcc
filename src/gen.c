@@ -57,6 +57,8 @@ int dflag = 0;
 int swap;
 
 unsigned (*emitter)(Node, int) = emitasm;
+// NeedsReg测试把具有副作用的节点与那些需要寄存器存放结果的节点区分开来.
+// NeedsReg按照通用操作码索引, 并标记产生值的操作码.
 static char NeedsReg[] = {
 	0,                      /* unused */
 	1,                      /* CNST */
@@ -78,7 +80,9 @@ Node head;
 
 unsigned freemask[2];
 unsigned usedmask[2];
+// tmask表示用于临时变量的寄存器
 unsigned tmask[2];
+// vmask表示分配给寄存器变量的寄存器
 unsigned vmask[2];
 // mkreg创建初始化寄存器符号
 Symbol mkreg(char *fmt, int n, int mask, int set) {
@@ -107,6 +111,7 @@ void mkauto(Symbol p) {
 	p->x.offset = -offset;
 	p->x.name = stringd(-offset);
 }
+// 在每一个块的开始, 编译前端都调用blockbeg来保存当前栈的偏移量以及每一个寄存器的分配状态
 void blockbeg(Env *e) {
 	e->offset = offset;
 	e->freemask[IREG] = freemask[IREG];
@@ -125,8 +130,14 @@ int mkactual(int align, int size) {
 	argoffset = n + size;
 	return n;
 }
+// 处理每一个参数列表结束的CALL节点时都要调用docall函数.
+// 该函数为下一个参数集合清除argoffset值, 计算出最大的
+// 输出参数块的大小并存于maxargoffset中.
 static void docall(Node p) {
 	p->syms[1] = p->syms[0];
+	// docall函数将当前调用参数块的大小记录在p->syms[0]中
+	// 因此必要时调用者可以将它弹出栈.X86代码生成器就使用了这种
+	// 机制
 	p->syms[0] = intconst(argoffset);
 	if (argoffset > maxargoffset)
 		maxargoffset = argoffset;
@@ -153,6 +164,9 @@ void blkcopy(int dreg, int doff, int sreg, int soff, int size, int tmp[]) {
 	else
 		(*IR->x.blkloop)(dreg, doff, sreg, soff, size, tmp);
 }
+/***
+ * @k
+ */
 static void blkunroll(int k, int dreg, int doff, int sreg, int soff, int size, int tmp[]) {
 	int i;
 
@@ -243,7 +257,7 @@ int mayrecalc(Node p) {
 	int op;
 
 	assert(p && p->syms[RX]);
-	// 如果节点不在公共子表达式, mayrelcalc就会返回假
+	// 如果节点不表示公共子表达式, mayrelcalc就会返回假
 	if (p->syms[RX]->u.t.cse == NULL)
 		return 0;
 	op = generic(p->syms[RX]->u.t.cse->op);
@@ -254,7 +268,11 @@ int mayrecalc(Node p) {
 		return 0;
 }
 // reduce及其辅助程序执行完毕后, gen调用prune.
-//
+// prune使用x.inst 标记在x.kids域中构建一棵树
+// prune的参数
+//	p 指向需要prune的树
+//	pp points to an element of some node's x.kids vector, namely the next element to fill in;
+// 返回值: 下一个要fill in 的kids元素的pointer 	
 static Node *prune(Node p, Node pp[]) {
 	if (p == NULL)
 		return pp;
@@ -288,6 +306,7 @@ int range(Node p, int lo, int hi) {
 	}
 	return LBURG_MAX;
 }
+// dump打印操作符和所有子树
 static void dumptree(Node p) {
 	if (p->op == VREG+P && p->syms[0]) {
 		fprint(stderr, "VREGP(%s)", p->syms[0]->name);
@@ -354,6 +373,7 @@ static void dumprule(int rulenum) {
 	if (!IR->x._isinstruction[rulenum])
 		fprint(stderr, "\n");
 }
+//
 unsigned emitasm(Node p, int nt) {
 	int rulenum;
 	short *nts;
@@ -447,6 +467,7 @@ static int requate(Node q) {
 static void prelabel(Node p) {
 	if (p == NULL)
 		return;
+	// 先序遍历
 	prelabel(p->kids[0]);
 	prelabel(p->kids[1]);
 	if (NeedsReg[opindex(p->op)])
@@ -472,9 +493,12 @@ static void prelabel(Node p) {
 	}
 	(IR->x.target)(p);
 }
+// setreg在节点中记录了来自rmap的值, 以支持寄存器定位(register target)和分配
+// prelabel调用setreg, 为所有带有相同类型后缀的操作码指派相同的通配符.
 void setreg(Node p, Symbol r) {
 	p->syms[RX] = r;
 }
+// rtarget(p,n,r)保证直接计算p->kids[n]的结果并保存到寄存器r中
 void rtarget(Node p, int n, Symbol r) {
 	Node q = p->kids[n];
 
@@ -482,9 +506,13 @@ void rtarget(Node p, int n, Symbol r) {
 	assert(r);
 	assert(r->sclass == REGISTER || !r->x.wildcard);
 	assert(q->syms[RX]);
+	// 如果子节点已被定位到另外一个寄存器变量或者 `返回寄存器`(the return register)
+	// 之类的特殊寄存器, 那么rtarget在树的父节点和子节点之间插入一个LOAD节点, 并定位LOAD节点(而不是原来的节点)
 	if (r != q->syms[RX] && !q->syms[RX]->x.wildcard) {
 		q = newnode(LOAD + opkind(q->op),
 			q, NULL, q->syms[0]);
+		// note: Symbol-table entries for temporaries that hold common subexpressions
+		// are identified as such by having nonnull u.t.cse fields.
 		if (r->u.t.cse == p->kids[n])
 			r->u.t.cse = q;
 		p->kids[n] = p->x.kids[n] = q;
@@ -493,6 +521,7 @@ void rtarget(Node p, int n, Symbol r) {
 	setreg(q, r);
 	debug(fprint(stderr, "(targeting %x->x.kids[%d]=%x to %s)\n", p, n, p->kids[n], r->x.name));
 }
+// rewrite完成单稞树的寄存器定位和指令选择
 static void rewrite(Node p) {
 	assert(p->x.inst == 0);
 	prelabel(p);
@@ -502,22 +531,32 @@ static void rewrite(Node p) {
 	debug(dumpcover(p, 1, 0));
 	reduce(p, 1);
 }
+// 接口函数gen从前端接收森林, 然后对这些树进行多次遍历
+// 第一次遍历: 调用rewrite选择指令,对列出的节点进行标记
+// 第二次遍历: 从树中删除子指令
 Node gen(Node forest) {
 	int i;
 	struct node sentinel;
 	Node dummy, p;
 
 	head = forest;
+	// 第一次遍历为参数和过程调用完成了与目标机器相关的处理.
+	// 例如: 按照调用约定使用寄存器传递参数.
 	for (p = forest; p; p = p->link) {
 		assert(p->count == 0);
+		// 如果调用没有返回值或者忽略返回值,那么调用本身就出现在森林中,下面的if语句来识别这种模式
 		if (generic(p->op) == CALL)
 			docall(p);
-		else if (   generic(p->op) == ASGN
+		// 调用指令将出现在对一个临时变量赋值的指令下面, 该临时变量用于以后需要返回值的地方.
+		// 第二个if语句用来识别这种模式.
+		else if (generic(p->op) == ASGN
 		&& generic(p->kids[1]->op) == CALL)
 			docall(p->kids[1]);
 		else if (generic(p->op) == ARG)
+			//只有doarg是目标机器相关的
 			(*IR->x.doarg)(p);
 		rewrite(p);
+		// 对列出的节点进行标记
 		p->x.listed = 1;
 	}
 	for (p = forest; p; p = p->link)
@@ -538,6 +577,9 @@ Node gen(Node forest) {
 				p->x.kids[i]->syms[RX]->x.lastuse = p->x.kids[i];
 			}
 		}
+	// 最后一遍扫描森林为每个节点分配一个寄存器.rmap是一个以类型后缀进行索引的向量,
+	// 它的每个元素都是一个表示寄存器组的寄存器通配符.这些寄存器组适合具有相应类型的
+	// 未定位节点
 	for (p = forest; p; p = p->x.next) {
 		ralloc(p);
 		if (p->x.listed && NeedsReg[opindex(p->op)]
@@ -595,6 +637,7 @@ static Symbol getreg(Symbol s, unsigned mask[], Node p) {
 	r->x.regnode->vbl = NULL;
 	return r;
 }
+// askregvar 试图为一个局部变量或者形式参数分配寄存器. 如果分配成功就返回1, 否则返回0
 int askregvar(Symbol p, Symbol regs) {
 	Symbol r;
 
@@ -630,6 +673,8 @@ static void linearize(Node p, Node next) {
 	relink(p, next);
 	debug(fprint(stderr, "(listing %x)\n", p));
 }
+// ralloc(p) 释放了所有p的子节点不再需要的寄存器, 然后, 如果p需要一个寄存器,
+// 且之前未被处理, 就给p分配一个寄存器.
 static void ralloc(Node p) {
 	int i;
 	unsigned mask[2];
@@ -680,13 +725,16 @@ static void ralloc(Node p) {
 		}
 	}
 	p->x.registered = 1;
+	// 最后, ralloc调用目标机器的clobber, 溢出所有因这个节点而被溢出的寄存器.
 	(*IR->x.clobber)(p);
 }
+// 在set中寻找使用点离here最远的寄存器
 static Symbol spillee(Symbol set, unsigned mask[], Node here) {
 	Symbol bestreg = NULL;
 	int bestdist = -1, i;
 
 	assert(set);
+	// 如果不是寄存器通配符
 	if (!set->x.wildcard)
 		bestreg = set;
 	else {
@@ -700,6 +748,7 @@ static Symbol spillee(Symbol set, unsigned mask[], Node here) {
 				Regnode rn = ri->x.regnode;
 				Node q = here;
 				int dist = 0;
+				// 从here节点开始往指令序列后面找
 				for (; q && !uses(q, rn); q = q->x.next)
 					dist++;
 				if (q && dist > bestdist) {
@@ -717,6 +766,7 @@ static Symbol spillee(Symbol set, unsigned mask[], Node here) {
 		to ensure that this register is never allocated to a variable. */
 	return bestreg;
 }
+// use 检查节点p是否读取了一个给定的寄存器
 static int uses(Node p, Regnode rn) {
 	int i;
 
@@ -730,6 +780,7 @@ static int uses(Node p, Regnode rn) {
 			return 1;
 	return 0;
 }
+// spillr(r, here) 溢出寄存器r, 并且把here之后r的每个使用都替换成一个重取操作
 static void spillr(Symbol r, Node here) {
 	int i;
 	Symbol tmp;
@@ -741,6 +792,7 @@ static void spillr(Symbol r, Node here) {
 	assert(p->x.registered && !readsreg(p));
 	tmp = newtemp(AUTO, optype(p->op), opsize(p->op));
 	genspill(r, p, tmp);
+	// spillr 将所有剩余的读取r的节点改成从溢出单元取值;最后是释放r
 	for (p = here->x.next; p; p = p->x.next)
 		for (i = 0; i < NELEMS(p->x.kids) && p->x.kids[i]; i++) {
 			Node k = p->x.kids[i];

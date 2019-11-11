@@ -124,6 +124,8 @@ void type_init(int argc, char *argv[]) {
 	inited = 1;
 	if (!IR)
 		return;
+	// 下面的循环主要是设置IR中各种类型度量:
+	// 如charmetric, shortmetric,
 	for (i = 1; i < argc; i++) {
 		int size, align, outofline;
 		if (strncmp(argv[i], "-unsigned_char=", 15) == 0)
@@ -212,6 +214,7 @@ void rmtypes(int lev) {
 		for (i = 0; i < NELEMS(typetable); i++) {
 			struct entry *tn, **tq = &typetable[i];
 			while ((tn = *tq) != NULL)
+				// 函数类型的type.u域放的不是sym, 需要单独处理
 				if (tn->type.op == FUNCTION) // 在链表中跳过函数类型
 					tq = &tn->link;
 				else if (tn->type.u.sym && tn->type.u.sym->scope >= lev)
@@ -306,7 +309,7 @@ Type qual(int op, Type ty) {
 	if (isarray(ty)) // 仅限定数组内元素的类型
 		ty = type(ARRAY, qual(op, ty->type), ty->size,
 			ty->align, NULL);
-	else if (isfunc(ty)) // 函数类型能限定
+	else if (isfunc(ty)) // 函数类型不能限定
 		warning("qualified function type ignored\n");
 	/* 限定符不能重复 */
 	else if (isconst(ty)    && op == CONST
@@ -423,8 +426,8 @@ Field newfield(char *name, Type ty, Type fty) {
 
 	if (name == NULL) /* 如果是匿名位域 */
 		name = stringd(genlabel(1));
-	for (p = *q; p; q = &p->link, p = *q)
-		if (p->name == name)
+	for (; *q; q = &p->link)
+		if ((*q)->name == name)
 			error("duplicate field name `%s' in `%t'\n",
 				name, ty);
 	NEW0(p, PERM);

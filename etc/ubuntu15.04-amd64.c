@@ -27,7 +27,7 @@ char inputs[256] = "";
  * $2将被替换成输入文件;
  * $3将被替换成输出文件.
  */
-//#define USE_GCC_CPP
+#define USE_GCC_CPP
 #ifdef USE_GCC_CPP
 char *cpp[] = { "/usr/bin/cpp",
 		"-U__GNUC__", "-D_POSIX_SOURCE", "-D__STRICT_ANSI__",
@@ -50,8 +50,8 @@ char *cpp[] = { LCCDIR "cpp",
  * to cpp's arguments when it invokes the preprocessor, except when -N is specified.
  */
 char *include[] = {"-I" LCCDIR "include",
-		"-I/usr/lib/gcc/x86_64-linux-gnu/4.9/include" ,
-		"-I/usr/local/include","-I/usr/lib/gcc/x86_64-linux-gnu/4.9/include-fixed",
+		"-I/usr/lib/gcc/x86_64-linux-gnu/7/include" ,
+		"-I/usr/local/include","-I/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed",
 		"-I/usr/include", 0 };
 
 /* 调用编译器rcc的命令行
@@ -77,22 +77,22 @@ char *ld[] = {
 	/*  0 */ "/usr/bin/ld", "-m", "elf_i386", "-dynamic-linker",
 	/*  4 */ "/lib/ld-linux.so.2", "-o", "$3",
 	/*  7 */ "/usr/lib32/crt1.o", "/usr/lib32/crti.o",
-	/*  9 */ "/usr/lib/gcc/x86_64-linux-gnu/4.9/32/crtbegin.o", 
+	/*  9 */ "/usr/lib/gcc/x86_64-linux-gnu/7/32/crtbegin.o",
                  "$1", "$2",
 	/* 12 */ "-L" LCCDIR,
 	/* 13 */ "-llcc",
-	"-L/usr/lib/gcc/x86_64-linux-gnu/4.9/32",
-	"-L/usr/lib/gcc/x86_64-linux-gnu/4.9/../../../i386-linux-gnu",
-	"-L/usr/lib/gcc/x86_64-linux-gnu/4.9/../../../../lib32 -L/lib/../lib32",
+	"-L/usr/lib/gcc/x86_64-linux-gnu/7/32",
+	"-L/usr/lib/gcc/x86_64-linux-gnu/7/../../../i386-linux-gnu",
+	"-L/usr/lib/gcc/x86_64-linux-gnu/7/../../../../lib32 -L/lib/../lib32",
 	"-L/usr/lib/i386-linux-gnu",
 	"-L/usr/lib/../lib32",
-	"-L/usr/lib/gcc/x86_64-linux-gnu/4.9",
-	"-L/usr/lib/gcc/x86_64-linux-gnu/4.9/../../../i386-linux-gnu",
-	"-L/usr/lib/gcc/x86_64-linux-gnu/4.9/../../.. -L/usr/lib/i386-linux-gnu",
+	"-L/usr/lib/gcc/x86_64-linux-gnu/7",
+	"-L/usr/lib/gcc/x86_64-linux-gnu/7/../../../i386-linux-gnu",
+	"-L/usr/lib/gcc/x86_64-linux-gnu/7/../../.. -L/usr/lib/i386-linux-gnu",
 		"-lgcc","-lc", "-lm",
 	/* 25 */ "",
-	/* 26 */ "/usr/lib/gcc/x86_64-linux-gnu/4.9/32/crtend.o",
-	"/usr/lib/gcc/x86_64-linux-gnu/4.9/../../../../lib32/crtn.o",
+	/* 26 */ "/usr/lib/gcc/x86_64-linux-gnu/7/32/crtend.o",
+	"/usr/lib/gcc/x86_64-linux-gnu/7/../../../../lib32/crtn.o",
 	0 };
 
 extern char *concat(char *, char *);

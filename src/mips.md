@@ -554,6 +554,7 @@ static void progbeg(int argc, char *argv[]) {
         d6 = mkreg("6", 6, 3, IREG);
         freg2w = mkwildcard(freg2);
         iregw = mkwildcard(ireg);
+        // tmask标识临时寄存器, vmask标识寄存器变量
         tmask[IREG] = INTTMP; tmask[FREG] = FLTTMP;
         vmask[IREG] = INTVAR; vmask[FREG] = FLTVAR;
         blkreg = mkreg("8", 8, 7, IREG);
@@ -568,6 +569,8 @@ static Symbol rmap(int opk) {
                 return 0;
         }
 }
+// target calls set reg to mark nodes that need a special register, and it
+// calls rtarget to mark nodes that need a child in a special register
 static void target(Node p) {
         assert(p);
         switch (specific(p->op)) {
@@ -611,6 +614,7 @@ static void target(Node p) {
         case ARG+B:  rtarget(p->kids[0], 0, blkreg); break;
         }
 }
+// 如果某条指令改写寄存器, clobber便调用spill预先将这些寄存器的值保存起来, 处理完当前操作后再恢复原值.
 static void clobber(Node p) {
         assert(p);
         switch (specific(p->op)) {
@@ -844,6 +848,7 @@ static void function(Symbol f, Symbol caller[], Symbol callee[], int ncalls) {
                 }
         if (framesize > 0)
                 print("addu $sp,$sp,%d\n", framesize);
+		// 返回地址总是存在$31寄存器中
         print("j $31\n");
         print(".end %s\n", f->x.name);
 }

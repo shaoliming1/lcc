@@ -82,13 +82,18 @@ extern int      swap;
 extern unsigned tmask[], vmask[];
 // 节点扩张
 // 代码生成器的主要操作就是对编译器前端的节点进行注释扩展
-// 注释记录了诸如指令选择和寄存器分配数据.
+// 注释记录了诸如指令选择和寄存器分配的数据.
 // 在node结构体中扩展的域被命名为x并具有Xnode类型
 typedef struct {
 	unsigned listed:1;
+	// 分配寄存器标志
 	unsigned registered:1;
+	// 是否产生该节点代码的标志
 	unsigned emitted:1;
+	// 标记在寄存器之间进行复制的指令
 	unsigned copy:1;
+	//  x. equatable to
+	// mark those that copy a register to a common-subexpression temporary
 	unsigned equatable:1;
 	unsigned spills:1;
 	unsigned mayrecalc:1;
@@ -107,19 +112,30 @@ typedef struct {
 	// argno域中记录参数的数目处理参数传递
 	short argno;
 } Xnode;
+// 目标无关的Regnode描述了一个目标相关的寄存器
+// 如果该寄存器被分配以保存一个变量(而不是一个临时变量),vbl就指向该变量的symbol结构体.
 typedef struct {
 	Symbol vbl;
+	//set 表示寄存器的集合
 	short set;
 	short number;
 	unsigned mask;
 } *Regnode;
 enum { IREG=0, FREG=1 };
 typedef struct {
+	// x.name是编译后端为该符号产生的名字, 对于全局变量,
+	// 在某些机器上,它可能等于name.对于局部变量和形参,
+	// 它是一个数字串, 其值等于栈偏移量x.offset
 	char *name;
 	unsigned int eaddr;  /* omit */
 	int offset;
+	// fields for temporaries
+	// 如果当前符号是一个编译前端存储公共子表达式的计算结果的临时变量, 那么
+	// 编译后端将通过x.lastuse把所有读或写该表达式的节点连接起来, 并用x.usecount
+	// 计算读写的次数
 	Node lastuse;
 	int usecount;
+
 	Regnode regnode;
 	Symbol *wildcard;
 } Xsymbol;
