@@ -542,6 +542,8 @@ void retcode(Tree p) {
 					q->scope == PARAM ? "parameter" : "local", q->name);
 		}
 	walk(tree(mkop(RET,p->type), p->type, p, NULL), 0, 0);
+	printdag(codelist->u.forest, 1);
+	// Symbol s = lookup("4");
 }
 void definelab(int lab) {
 	Code cp;

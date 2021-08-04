@@ -256,6 +256,10 @@ static Tree unary(void) {
 		break;
 	default:
 		p = postfix(primary());
+		fprint(stdout, "--------\n");
+		printtree(p, 1);
+		fprint(stdout, "--------\n");
+
 	}
 	return p;
 }

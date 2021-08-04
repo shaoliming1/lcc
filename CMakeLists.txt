@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
-project(rcc C)
+# set the projec t name and version number
+project(rcc C )
 
 set(CMAKE_C_STANDARD 99)
 include_directories (${rcc_SOURCE_DIR}/src)
@@ -40,4 +41,8 @@ add_executable(rcc
         ${rcc_SOURCE_DIR}/src/sparc.c
         ${rcc_SOURCE_DIR}/src/x86.c
         ${rcc_SOURCE_DIR}/src/x86linux.c
+        )
+
+add_executable(ops
+        ${rcc_SOURCE_DIR}/etc/ops.c
         )
