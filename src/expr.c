@@ -99,7 +99,10 @@ static Tree expr2(void) {
 			}
 		p = condtree(p, l, r);
 	}
-	return p;
+	print("--------\n");
+    printtree(p, 1);
+    print("--------\n");
+    return p;
 }
 Tree value(Tree p) {
 	int op = generic(rightkid(p)->op);
@@ -256,10 +259,6 @@ static Tree unary(void) {
 		break;
 	default:
 		p = postfix(primary());
-		fprint(stdout, "--------\n");
-		printtree(p, 1);
-		fprint(stdout, "--------\n");
-
 	}
 	return p;
 }

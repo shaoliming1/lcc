@@ -93,7 +93,7 @@ Node newnode(int op, Node l, Node r, Symbol sym) {
 }
 // killnodes去掉因为赋值（ASGN)导致的失效节点
 // lcc按两种情况处理：
-// 对标识符的赋值要删除标识符的右值节点，而其他有副作用的操作符要清楚所有节点
+// 对标识符的赋值要删除标识符的右值节点，而其他有副作用的操作符要清除所有节点
 // 。
 static void killnodes(Symbol p) {
 	int i;

@@ -14,3 +14,16 @@ static void defsymbol(Symbol p) {
     else
         p->x.name = p->name;
 }
+
+static void function(Symbol f, Symbol caller[], Symbol callee[], int n){
+    if(f->u.f.ncalls){
+        // 非leaf函数会比leaf函数多保存一个leaf函数
+        print("push {r11, lr}\n");
+        print("add r11, sp, #0\n");
+        print("sub sp, sp, #16");
+    }else{
+        print("push {r11}\n");
+        print("add r11, sp, #0\n");
+        print("sub sp sp #12\n");
+    }
+}
